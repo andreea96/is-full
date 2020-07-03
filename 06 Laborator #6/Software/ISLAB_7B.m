@@ -1,4 +1,4 @@
-function ISLAB_7A(N,sigma,lambda) 
+function ISLAB_7B(N,sigma,lambda) 
 %
 % ISLAB_6A   Module that performs comparison between recursive 
 %            identification procedures on an ARMAX process with 
