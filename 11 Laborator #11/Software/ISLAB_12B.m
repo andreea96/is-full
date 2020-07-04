@@ -1,4 +1,4 @@
-function [F,D,M] = ISLAB_12A(mt,K0,T0,Tmax,Ts,U,lambda) 
+function [F,D,M] = ISLAB_12B(mt,K0,T0,Tmax,Ts,U,lambda) 
 %
 % ISLAB_12A   Module that performs off-line identification of 
 %             physical parameters of a DC engine (gain and 
@@ -143,11 +143,11 @@ mt = abs(round(mt(1))) ;
 % Estimate discrete time parameters
 % ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 if (~mt)
-   M = oe(D,[50 50 1]) ; 	        % Model of tipe OE. 
+   M = oe(D,[2 2 1]) ; 	        % Model of tipe OE. 
 else
-   M = arx(D,[50 50 1]) ;         % Model of type ARX. 
+   M = arx(D,[2 2 1]) ;         % Model of type ARX. 
 end 
-% 
+
 % Estimate physical parameters
 % ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 if (~mt)                        % OE model. 
@@ -200,6 +200,80 @@ figure(FIG),clf
    set(FIG,'DefaultTextHorizontalAlignment','left') ; 
    legend('simulated output','measured output') ; 
 FIG = FIG+1 ;
+
+figure(FIG),clf
+noise_disp(1)=0;
+noise(1)=0;
+    for n=2:length(t)
+        noise(n) = D.y(n)-V.y(n);
+        noise_disp(n) =  (noise_disp(n-1)+(noise(n))^2)/n;
+    end
+   fig_look(FIG,1.5) ; 
+   plot(t,D.y-V.y,'-b',t,noise_disp,'-r') ; 
+   FN = scaling([V.y D.y]) ;     % Re-scale the axes. 
+   axis([0 Tmax FN]) ; 
+   title(['Output data provided by a DC engine ' ... 
+          'and its discrete model.']) ; 
+   xlabel('Time [s]') ; 
+   set(FIG,'DefaultTextHorizontalAlignment','left') ; 
+   legend('Noise','Noise dispertion') ; 
+FIG = FIG+1 ;
+
+noise=iddata(D.u,noise',Ts);
+% 
+% Estimate noise
+% ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+na=2%randi(20);
+nb=2%randi(20);
+nc=1%randi(20);
+
+white_noise_disp(1)=0;
+for n=2:length(t)
+    white_noise_disp(n) =  (white_noise_disp(n-1)+(noise.y(n))^2)/n;
+end
+
+
+if (~mt) % OE
+   noiseModel = armax(noise,[na nb nc 1]) ; 	        
+else %ARX
+    x=filter(1,M.A,noise.y);
+    [r,lg] = xcorr(x,'biased');
+    noiseA = levinson(r,numel(M.A)-1); 
+    noiseModel = idpoly(noiseA,[],[],[],[],1,Ts);
+end 
+
+
+noise.y = sim(noiseModel,[D.u zeros(size(D.u))]) ; 
+
+% 
+% Plot measured output and noised simulated one
+% ~~~~~~~~~~~~~~~~~~~~~~~
+pTitle = join(['na=',int2str(na),'nb=',int2str(nb),'nc=',int2str(nc)],', ');
+
+figure(FIG),clf
+   fig_look(FIG,1.5) ; 
+   plot(t,D.y,'-b',t,V.Y+noise.y,'-r') ; 
+   FN = scaling([V.y D.y]) ;     % Re-scale the axes. 
+   axis([0 Tmax FN]) ; 
+   title([pTitle]); 
+   xlabel('Time [s]') ; 
+   set(FIG,'DefaultTextHorizontalAlignment','left') ; 
+   legend('Measured  output','Simulate output+noise') ; 
+FIG = FIG+1 ;
+lambda2 = std(white_noise_disp)^2
+pTitle2 = join(['\lambda^2=',int2str(lambda2)]);
+figure(FIG),clf
+   fig_look(FIG,1.5) ; 
+   plot(t,white_noise_disp,'-b') ; 
+   FN = scaling([V.y D.y]) ;     % Re-scale the axes. 
+   axis([0 Tmax FN]) ; 
+   title([pTitle2]); 
+   xlabel('Time [s]') ; 
+   set(FIG,'DefaultTextHorizontalAlignment','left') ; 
+   legend('Measured  output') ; 
+FIG = FIG+1 ;
+% 
+
 
 %
 % END

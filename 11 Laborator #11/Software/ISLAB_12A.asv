@@ -200,7 +200,6 @@ figure(FIG),clf
    set(FIG,'DefaultTextHorizontalAlignment','left') ; 
    legend('simulated output','measured output') ; 
 FIG = FIG+1 ;
-
 %
 % END
 %
