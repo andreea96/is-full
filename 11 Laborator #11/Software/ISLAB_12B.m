@@ -239,7 +239,7 @@ else %ARX
     x=filter(1,M.A,noise.y);
     [r,lg] = xcorr(x,'biased');
     noiseA = levinson(r,numel(M.A)-1); 
-    noiseModel = idpoly(noiseA,[],[],[],[],1,Ts);
+    noiseModel = idpoly(noiseA,ones(801,1),[],[],[],1,Ts);
 end 
 
 
