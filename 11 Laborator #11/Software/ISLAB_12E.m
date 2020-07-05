@@ -1,4 +1,4 @@
-function [F,ID,SD] = ISLAB_12D(mt,K0,T0,Tmax,Ts,U,lambda) 
+function [F,ID,SD] = ISLAB_12E(mt,K0,T0,Tmax,Ts,U,lambda) 
 %
 % ISLAB_12D   Module that performs on-line identification of 
 %             physical parameters of a DC engine (gain and 
@@ -172,6 +172,7 @@ if (~mt)			% Model of type OE.
         for i = 1 : NrSam   % for each entry in the dataset
             [A, B, SD(i)] = step(EstOE, ID.y(i), ID.u(i)); % identify the 
                                                          % parameters
+            B=[B 0 0];
             theta(i, 1:2) = A(2:3); % save the new parameters, to work with
             theta(i, 3:4) = B(2:3); % the rest of the program
         end
@@ -239,6 +240,48 @@ figure(FIG),clf
    set(FIG,'DefaultTextHorizontalAlignment','left') ; 
    legend('simulated output','measured output') ; 
 FIG = FIG+1 ;
+% output variance
+ 
+figure(FIG),clf
+   fig_look(FIG,1.5) ; 
+   subplot(311)
+      vy = ID.y-SD.y;
+      meanVy = mean(vy,'all');
+      sigma_vy = sum(vy-meanVy);
+      plot(t,vy,'-r') ; 
+					% Re-scale the axes. 
+      FN = scaling([F.K(WE) P.num{1}(WE)']) ;	
+      axis([t(1) Tmax FN]) ; 
+      title(['12.2']) ; 
+      xlabel('Time [s]') ; 
+      ylabel('Error') ; 
+      text(40,8,['\sigma_y^2=' sprintf('%g',sigma_vy)]);
+      set(FIG,'DefaultTextHorizontalAlignment','left') ; 
+      set(FIG,'DefaultTextHorizontalAlignment','center') ; 
+   subplot(312)
+      vk = F.K'-P.num{1};
+      meanVk = mean(vk,'all');
+      sigma_vk = sum(vk-meanVk);
+      plot(t,vk,'-r') ; 
+					% Re-scale the axes. 
+      FN = scaling([F.T(WE) P.den{1}(WE)']) ; 
+      axis([t(1) Tmax FN]) ; 
+      ylabel('Gain ERROR') ; 
+      xlabel('Time [s]') ; 
+      text(40,0.7, ...
+          ['\sigma_k^2 =    ' sprintf('%g',sigma_vk)]);
+      subplot(313)
+      vt=F.T'-P.den{1};
+      meanVt = mean(vt,'all');
+      sigma_vt = sum(vt-meanVt);
+      plot(t,vt,'-r') ; 
+      FN = scaling([F.T P.den{1}']) ;	% Re-scale the axes. 
+      axis([0 Tmax FN]) ;  
+      text(40,1,['\sigma_t^2 = ' sprintf('%g',sigma_vt)]);
+      ylabel('T [s] ERROR') ; 
+      xlabel('Time [s]') ; 
+FIG = FIG+1 ;
+
 % 
 % Plot physical parameters variation
 % ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
