@@ -223,9 +223,9 @@ noise=iddata(D.u,noise',Ts);
 % 
 % Estimate noise
 % ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-na=2%randi(20);
-nb=2%randi(20);
-nc=1%randi(20);
+na=randi(20);
+nb=randi(20);
+nc=randi(20);
 
 white_noise_disp(1)=0;
 for n=2:length(t)
@@ -264,7 +264,7 @@ lambda2 = std(white_noise_disp)^2
 pTitle2 = join(['\lambda^2=',int2str(lambda2)]);
 figure(FIG),clf
    fig_look(FIG,1.5) ; 
-   plot(t,white_noise_disp,'-b') ; 
+   plot(t,white _noise_disp,'-b') ; 
    FN = scaling([V.y D.y]) ;     % Re-scale the axes. 
    axis([0 Tmax FN]) ; 
    title([pTitle2]); 

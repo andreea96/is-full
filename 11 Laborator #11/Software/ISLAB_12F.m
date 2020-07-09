@@ -1,4 +1,4 @@
-function [F,ID,SD] = ISLAB_12E(mt,K0,T0,Tmax,Ts,U,lambda) 
+function [F,ID,SD] = ISLAB_12F(mt,K0,T0,Tmax,Ts,U,lambda) 
 %
 % ISLAB_12D   Module that performs on-line identification of 
 %             physical parameters of a DC engine (gain and 
@@ -154,59 +154,16 @@ if (~cv)
 end 
 % 
 Tmax = Ts*round(Tmax/Ts) ; 	% Correct Tmax. 
-% Estimate and pursue discrete time parameters
+% Estimate using state space
 % ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-if (~mt)			% Model of type OE.
-   %%%%%%%%%%%%%%%%%%%%%%%%%%%%% NEW STUFF %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    v = version('-release'); % get release of Matlab
-    if (strcmp(v, '2014b') || strcmp(v, '2015a')) 
-        [theta,SD] = roe(ID,[2 2 1],'ff',0.999) ; 
-        theta = theta(:,[3 4 1 2]) ; % theta = [B|F]->[F|B].
-    else % if the release of Matlab is at least 2015b
-        EstOE = recursiveOE([2 2 1]); % initialize the ARX estimator
-        EstOE.ForgettingFactor = 0.999;  % choose the estimation method and 
-                                   % forgetting factor
-        NrSam = Tmax * 1 / Ts + 1;
-        theta = zeros(NrSam, 4);
-        SD = zeros(NrSam, 1);
-        for i = 1 : NrSam   % for each entry in the dataset
-            [A, B, SD(i)] = step(EstOE, ID.y(i), ID.u(i)); % identify the 
-                                                         % parameters
-            B=[B 0 0];
-            theta(i, 1:2) = A(2:3); % save the new parameters, to work with
-            theta(i, 3:4) = B(2:3); % the rest of the program
-        end
-    end
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%% NEW STUFF %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-   theta = theta(:,[3 4 1 2]) ; % theta = [B|F]->[F|B].
-else				% Model of type ARX. 
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%% NEW STUFF %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    v = version('-release'); % get release of Matlab
-    if (strcmp(v, '2014b') || strcmp(v, '2015a')) 
-        [theta,SD] = rarx(ID,[2 2 1],'ff',0.999) ;
-				% theta = [A|B]. 
-    else % if the release of Matlab is at least 2015b
-        EstARX = recursiveARX([2 2 1]); % initialize the ARX estimator
-        EstARX.ForgettingFactor = 0.999;  % choose the estimation method
-                                   % and the forgetting factor
-        NrSam = Tmax * 1 / Ts + 1; % number of samples
-        theta = zeros(NrSam, 4);
-        SD = zeros(NrSam, 1);
-        for i = 1 : NrSam   % for each entry in the dataset
-            [A, B, SD(i)] = step(EstARX, ID.y(i), ID.u(i)); % identify the 
-                                                         % parameters
-            theta(i, 1:2) = A(2:3); % save the new parameters, to work
-            theta(i, 3:4) = B(2:3); % with the rest of the program
-        end
-    end
-    %%%%%%%%%%%%%%%%%%%%%%%%%%%%% NEW STUFF %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-end 
+ [theta,ythat,P,phi,psi]=rpem([ID.u ID.y],[2 2 0 0 1 1],'ff',0.99); %rpem estimation
+ theta = theta(:,[3 4 1 2]) ; % theta = [B|F]->[F|B].
 war_err(WE) ; 
 SD = iddata(SD,V.u,Ts) ; 	% Pack simulation data. 
 % 
 % Estimate physical parameters
 % ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   F.K = (theta(:,3)+theta(:,4))./(1-theta(:,2))/Ts ; 
+   F.K = (theta(:,3)+theta( :,4))./(1-theta(:,2))/Ts ; 
    F.T = Ts*(theta(:,2).*theta(:,3)+theta(:,4))./ ... 
          (theta(:,3)+theta(:,4))./(1-theta(:,2)) ; 
 %   F.T = -Ts./log(theta(:,2)) ; 
