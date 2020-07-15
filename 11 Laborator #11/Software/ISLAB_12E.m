@@ -255,7 +255,7 @@ figure(FIG),clf
       title(['12.2']) ; 
       xlabel('Time [s]') ; 
       ylabel('Error') ; 
-      text(40,8,['\sigma_y^2=' sprintf('%g',sigma_vy)]);
+      title(['\sigma_y^2=' sprintf('%g',sigma_vy)]);
       set(FIG,'DefaultTextHorizontalAlignment','left') ; 
       set(FIG,'DefaultTextHorizontalAlignment','center') ; 
    subplot(312)
@@ -353,7 +353,7 @@ end
 figure(FIG),clf
    fig_look(FIG,1.5) ; 
    subplot(211)
-   plot(t,ID.y,'-r',t,SD.y+vy,'-b',t,ID.y,'-r') ; 
+   plot(t,ID.y,'-r',t,SD.y+noiseY,'-b',t,ID.y,'-r') ; 
    title(['na = ' sprintf('%g', na) '  nc = ' sprintf('%g',nc)]) ;
    legend('Measured data','Simulated data+noise') ; 
    
@@ -365,6 +365,8 @@ figure(FIG),clf
    plot(t,varE,'-r') ; 
    title(join(['\lambda^2 =',num2str(sigmaE)]));
    legend('White noise variation') ; 
+   
+FIG = FIG+1 ;
    					
 %
 % END

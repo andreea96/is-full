@@ -154,19 +154,79 @@ if (~cv)
 end 
 % 
 Tmax = Ts*round(Tmax/Ts) ; 	% Correct Tmax. 
-% Estimate using state space
-% ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- [theta,ythat,P,phi,psi]=rpem([ID.u ID.y],[2 2 0 0 1 1],'ff',0.99); %rpem estimation
- theta = theta(:,[3 4 1 2]) ; % theta = [B|F]->[F|B].
+
+if (~mt)			% Model of type OE.
+   %%%%%%%%%%%%%%%%%%%%%%%%%%%%% NEW STUFF %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    v = version('-release'); % get release of Matlab
+    if (strcmp(v, '2014b') || strcmp(v, '2015a')) 
+        [theta,SD] = roe(ID,[2 2 1],'ff',0.999) ; 
+        theta = theta(:,[3 4 1 2]) ; % theta = [B|F]->[F|B].
+    else % if the release of Matlab is at least 2015b
+        EstOE = recursiveOE([2 2 1]); % initialize the ARX estimator
+        EstOE.ForgettingFactor = 0.999;  % choose the estimation method and 
+                                   % forgetting factor
+        NrSam = Tmax * 1 / Ts + 1;
+        theta = zeros(NrSam, 4);
+        SD = zeros(NrSam, 1);
+        for i = 1 : NrSam   % for each entry in the dataset
+            [A, B, SD(i)] = step(EstOE, ID.y(i), ID.u(i)); % identify the 
+                                                         % parameters
+            B=[B 0 0];
+            theta(i, 1:2) = A(2:3); % save the new parameters, to work with
+            theta(i, 3:4) = B(2:3); % the rest of the program
+        end
+    end
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%% NEW STUFF %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+   theta = theta(:,[3 4 1 2]) ; % theta = [B|F]->[F|B].
+else				% Model of type ARX. 
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%% NEW STUFF %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    v = version('-release'); % get release of Matlab
+    if (strcmp(v, '2014b') || strcmp(v, '2015a')) 
+        [theta,SD] = rarx(ID,[2 2 1],'ff',0.999) ;
+				% theta = [A|B]. 
+    else % if the release of Matlab is at least 2015b
+        EstARX = recursiveARX([2 2 1]); % initialize the ARX estimator
+        EstARX.ForgettingFactor = 0.999;  % choose the estimation method
+                                   % and the forgetting factor
+        NrSam = Tmax * 1 / Ts + 1; % number of samples
+        theta = zeros(NrSam, 4);
+        SD = zeros(NrSam, 1);
+        for i = 1 : NrSam   % for each entry in the dataset
+            [A, B, SD(i)] = step(EstARX, ID.y(i), ID.u(i)); % identify the 
+                                                         % parameters
+            theta(i, 1:2) = A(2:3); % save the new parameters, to work
+            theta(i, 3:4) = B(2:3); % with the rest of the program
+        end
+    end
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%% NEW STUFF %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+end 
 war_err(WE) ; 
 SD = iddata(SD,V.u,Ts) ; 	% Pack simulation data. 
+% Estimate physical parameters
+% ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   F.K = (theta(:,3)+theta(:,4))./(1-theta(:,2))/Ts ; 
+   F.T = Ts*(theta(:,2).*theta(:,3)+theta(:,4))./ ... 
+         (theta(:,3)+theta(:,4))./(1-theta(:,2)) ; 
+     
+     
+% Estimate using state space
+% ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+[theta,ythat,P_state,phi,psi]=rpem([ID.u ID.y],[1 1 1 0 1 1],'ff',0.99); %rpem estimation
+war_err(WE) ; 
 % 
 % Estimate physical parameters
 % ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   F.K = (theta(:,3)+theta( :,4))./(1-theta(:,2))/Ts ; 
-   F.T = Ts*(theta(:,2).*theta(:,3)+theta(:,4))./ ... 
-         (theta(:,3)+theta(:,4))./(1-theta(:,2)) ; 
-%   F.T = -Ts./log(theta(:,2)) ; 
+   alfa = 3000;
+   beta = 6200;
+   theta1 = theta(:,1);
+   theta2 = theta(:,3);
+   F_state.T = -1/theta1;
+   F_state.K = -(alfa*beta*theta2)./theta1;
+   
+   %noise estimation
+   vy_state = ID.y - ythat;
+   [noiseTheta_state, noiseY_state] = rarmax(vy_state,[2 1], 'ff', 0.98);
+  
 % 
 % Plot I/O data
 % ~~~~~~~~~~~~~
@@ -310,7 +370,7 @@ end
 figure(FIG),clf
    fig_look(FIG,1.5) ; 
    subplot(211)
-   plot(t,ID.y,'-r',t,SD.y+vy,'-b',t,ID.y,'-r') ; 
+   plot(t,ID.y,'-r',t,SD.y+noiseY,'-b',t,ID.y,'-r') ; 
    title(['na = ' sprintf('%g', na) '  nc = ' sprintf('%g',nc)]) ;
    legend('Measured data','Simulated data+noise') ; 
    
@@ -322,7 +382,39 @@ figure(FIG),clf
    plot(t,varE,'-r') ; 
    title(join(['\lambda^2 =',num2str(sigmaE)]));
    legend('White noise variation') ; 
-   					
-%
+   FIG=FIG+1;
+
+   figure(FIG);
+   subplot(411);
+   plot(t,ID.y,'-r',t,ythat+noiseY_state,'-b',t,ID.y,'-r') ; 
+   title(join(['12.2-d \alpha=', num2str(alfa), ' \beta=', num2str(beta)]));
+   legend('measured data', 'estimated data+noise') ; 
+   
+   subplot(412);
+   vy_state=ID.y-ythat-noiseY_state;
+   meanVy = mean(vy_state,'all');
+   sigmay_state = sum(vy_state-meanVy);
+   plot(t,vy_state,'-r') ; 
+   title(join(['\sigma^2_y=', num2str(sigmay_state)]));
+   legend('output error');
+   
+   subplot(413);
+   k_error = F_state.K'-P.num{1};
+   meanK = mean(k_error,'all');
+   sigmaK = sum(k_error-meanK,'all');
+   plot(t,k_error,'-r') ; 
+   title(join(['\sigma^2_k=', num2str(sigmaK)]));
+   legend('gain error');
+   
+   subplot(414);
+   t_error = F_state.T-P.num{1};
+   meanT = mean(t_error,'all');
+   sigmaT = sum(t_error-meanK,'all');
+   plot(t,t_error,'-r') ; 
+   title(join(['\sigma^2_t=', num2str(sigmaT)]));
+   legend('time error');
+   
+    FIG=FIG+1;
+
 % END
 %
